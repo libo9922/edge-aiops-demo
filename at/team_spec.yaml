@@ -1,0 +1,105 @@
+# AgentTeams K8s CRD mirror of team_spec.json
+# Compatible with AgentTeams v1.2 Worker CR + Team CR + Manager CR.
+# Workflow is declared as dependency_graph; the Manager dispatches at runtime.
+---
+apiVersion: agentteams.aliyun.com/v1alpha1
+kind: Team
+metadata:
+  name: edge-aiops-demo
+  labels:
+    domain: edge-aiops
+    version: "0.3.0"
+spec:
+  manager:
+    name: ops_manager
+    runtime: qwenpaw
+  leader:
+    name: ops_team_leader
+    runtime: qwenpaw
+  workflow:
+    type: dependency_graph
+    tasks:
+      - id: incident.detect
+        owner: edge_sentinel
+        depends_on: []
+      - id: incident.attribute
+        owner: edge_diagnostician
+        depends_on: ["incident.detect"]
+      - id: incident.plan
+        owner: edge_orchestrator
+        depends_on: ["incident.attribute"]
+      - id: incident.verify
+        owner: edge_sentry
+        depends_on: ["incident.plan"]
+  scenario:
+    default: model_drift
+    available:
+      - model_drift
+      - edge_node_failure
+---
+apiVersion: agentteams.aliyun.com/v1alpha1
+kind: Worker
+metadata:
+  name: edge_sentinel
+spec:
+  role: worker
+  stage: detect
+  prompt_ref: agents/edge-sentinel/Agent.md
+  skills:
+    - alert-fusion
+    - impact-mapping
+  tools:
+    - mock_ticket.get_customer_complaint
+    - mock_monitoring.list_alerts
+    - mock_fleet.list_nodes
+---
+apiVersion: agentteams.aliyun.com/v1alpha1
+kind: Worker
+metadata:
+  name: edge_diagnostician
+spec:
+  role: worker
+  stage: analyze
+  prompt_ref: agents/edge-diagnostician/Agent.md
+  skills:
+    - log-trace-rca
+    - model-governance
+  tools:
+    - mock_logs.search_logs
+    - mock_traces.query_traces
+    - mock_model.get_version_history
+    - mock_ota.list_recent_updates
+    - mock_node.get_resource_snapshot
+    - mock_runbook.search
+---
+apiVersion: agentteams.aliyun.com/v1alpha1
+kind: Worker
+metadata:
+  name: edge_orchestrator
+spec:
+  role: worker
+  stage: plan
+  prompt_ref: agents/edge-orchestrator/Agent.md
+  skills:
+    - remediation-plan
+    - risk-guard
+  tools:
+    - mock_executor.create_action_request
+    - mock_ticket.create_approval_task
+---
+apiVersion: agentteams.aliyun.com/v1alpha1
+kind: Worker
+metadata:
+  name: edge_sentry
+spec:
+  role: worker
+  stage: verify
+  prompt_ref: agents/edge-sentry/Agent.md
+  skills:
+    - recovery-verify
+    - model-governance
+  tools:
+    - mock_executor.get_action_request
+    - mock_probe.check_inference_endpoint
+    - mock_monitoring.query_metrics
+    - mock_node.get_resource_snapshot

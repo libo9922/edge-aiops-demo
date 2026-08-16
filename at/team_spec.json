@@ -1,0 +1,132 @@
+{
+  "team_name": "edge-aiops-demo",
+  "display_name": "Edge AIOps Demo Team",
+  "version": "0.3.0",
+  "description": "Edge AIOps multi-agent team specialized for edge + model + OTA incidents. 4 business agents + TeamLeader, orchestrated by the Manager. Agents make decisions and file execution requests; external Operators perform the actual side effects. Workflow is declared as a dependency graph (DAG-ready) and the Manager dispatches respecting those dependencies at runtime.",
+  "manager_agent": "ops_manager",
+  "team_leader": "ops_team_leader",
+  "scenario_adapter": "scenario_runner",
+  "business_agents": [
+    "edge_sentinel",
+    "edge_diagnostician",
+    "edge_orchestrator",
+    "edge_sentry"
+  ],
+  "max_parallel_workers": 1,
+  "default_scenario": "model_drift",
+  "available_scenarios": ["model_drift", "edge_node_failure"],
+  "tool_gateway": {
+    "transport": "http-mock-tool-gateway",
+    "base_url_env": "EDGE_AIOPS_TOOL_GATEWAY_URL",
+    "default_base_url": "http://127.0.0.1:18090",
+    "reset_endpoint": "POST /tools/{scenario_id}/reset",
+    "inspect_requests": "GET /tools/{scenario_id}/requests"
+  },
+  "agents": [
+    {
+      "name": "ops_manager",
+      "role": "manager",
+      "responsibility": "Create the team, dispatch the initial incident, and aggregate final outcomes.",
+      "inputs": ["incident_summary", "scenario_id"],
+      "outputs": ["final_team_decision"],
+      "interacts_with": ["ops_team_leader"]
+    },
+    {
+      "name": "ops_team_leader",
+      "role": "team_leader",
+      "responsibility": "Decompose the incident into per-agent tasks, dispatch according to the dependency graph, and finalize the report.",
+      "inputs": ["incident_summary"],
+      "outputs": ["task_plan", "final_report"],
+      "interacts_with": [
+        "edge_sentinel",
+        "edge_diagnostician",
+        "edge_orchestrator",
+        "edge_sentry"
+      ]
+    },
+    {
+      "name": "edge_sentinel",
+      "role": "worker",
+      "stage": "detect",
+      "responsibility": "Watch the edge fleet + model + OTA plane; fuse signals into one incident candidate.",
+      "tools_category": "decision-support",
+      "uses_skills": ["alert-fusion", "impact-mapping"],
+      "uses_tools": [
+        "mock_ticket.get_customer_complaint",
+        "mock_monitoring.list_alerts",
+        "mock_fleet.list_nodes"
+      ],
+      "files_execution_requests": false
+    },
+    {
+      "name": "edge_diagnostician",
+      "role": "worker",
+      "stage": "analyze",
+      "responsibility": "Multi-source attribution across logs, traces, model telemetry, OTA history, node resources, and runbooks.",
+      "tools_category": "decision-support",
+      "uses_skills": ["log-trace-rca", "model-governance"],
+      "uses_tools": [
+        "mock_logs.search_logs",
+        "mock_traces.query_traces",
+        "mock_model.get_version_history",
+        "mock_ota.list_recent_updates",
+        "mock_node.get_resource_snapshot",
+        "mock_runbook.search"
+      ],
+      "files_execution_requests": false
+    },
+    {
+      "name": "edge_orchestrator",
+      "role": "worker",
+      "stage": "plan",
+      "responsibility": "Convert RCA + governance into ordered, risk-classified execution requests. The only agent that files execution requests.",
+      "tools_category": "execution-request",
+      "uses_skills": ["remediation-plan", "risk-guard"],
+      "uses_tools": [
+        "mock_executor.create_action_request",
+        "mock_ticket.create_approval_task"
+      ],
+      "files_execution_requests": true
+    },
+    {
+      "name": "edge_sentry",
+      "role": "worker",
+      "stage": "verify",
+      "responsibility": "Verify recovery via metrics and probes; report auto-approved vs pending-approval actions; emit postmortem.",
+      "tools_category": "verification",
+      "uses_skills": ["recovery-verify", "model-governance"],
+      "uses_tools": [
+        "mock_executor.get_action_request",
+        "mock_probe.check_inference_endpoint",
+        "mock_monitoring.query_metrics",
+        "mock_node.get_resource_snapshot"
+      ],
+      "files_execution_requests": false
+    },
+    {
+      "name": "scenario_runner",
+      "role": "scenario-adapter",
+      "responsibility": "Deterministic scenario loader + tool gateway driver. Holds the dependency graph and submits per-stage tasks to the Manager."
+    }
+  ],
+  "dependency_graph": [
+    {"task": "incident.detect",  "owner": "edge_sentinel",       "depends_on": []},
+    {"task": "incident.attribute","owner": "edge_diagnostician",  "depends_on": ["incident.detect"]},
+    {"task": "incident.plan",     "owner": "edge_orchestrator",   "depends_on": ["incident.attribute"]},
+    {"task": "incident.verify",   "owner": "edge_sentry",         "depends_on": ["incident.plan"]}
+  ],
+  "handoffs": [
+    {"from": "edge_sentinel",       "to": "edge_diagnostician", "payload": "incident_summary"},
+    {"from": "edge_diagnostician",  "to": "edge_orchestrator",  "payload": "rca_result"},
+    {"from": "edge_orchestrator",   "to": "edge_sentry",        "payload": "execution_requests"},
+    {"from": "edge_sentry",         "to": "ops_team_leader",    "payload": "recovery_report"}
+  ],
+  "execution_model": {
+    "principle": "Agents make decisions and file execution requests. The actual side effect is performed by external Operators.",
+    "request_queue": "GET /tools/{scenario_id}/requests",
+    "auto_approve_levels": ["L0", "L1"],
+    "pending_approval_levels": ["L2", "L3"]
+  },
+  "k8s_crd_compatible": true,
+  "crd_notes": "AgentTeams v1.2 also accepts K8s CRD YAML (Worker/Team/Manager). This JSON spec maps 1:1 to a Worker CR set + a Team CR with the dependency_graph as workflow.ref. See at/team_spec.yaml for the CRD mirror."
+}
