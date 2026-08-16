@@ -1,0 +1,86 @@
+{
+  "transport": "http-mock-tool-gateway",
+  "base_url": "http://<TOOL_HOST_REACHABLE_BY_WORKER>:18090",
+  "call_pattern": "POST /tools/{scenario_id}/{tool_name}.{function_name}",
+  "design_principle": "Agents make decisions and file execution requests. Real execution is performed by external Operators (K8s / ML platform / OTA) that poll the request queue. Demo mock just records requests and applies the L0/L1 vs L2/L3 policy gate.",
+  "tools": [
+    {
+      "name": "mock_ticket",
+      "kind": "http-mock-adapter",
+      "category": "decision-support",
+      "functions": ["get_customer_complaint", "create_approval_task"],
+      "future_mcp_mapping": "ticket.create_or_update"
+    },
+    {
+      "name": "mock_monitoring",
+      "kind": "http-mock-adapter",
+      "category": "decision-support",
+      "functions": ["list_alerts", "query_metrics"],
+      "future_mcp_mapping": "monitoring.query_metrics"
+    },
+    {
+      "name": "mock_logs",
+      "kind": "http-mock-adapter",
+      "category": "decision-support",
+      "functions": ["search_logs"],
+      "future_mcp_mapping": "log.search"
+    },
+    {
+      "name": "mock_traces",
+      "kind": "http-mock-adapter",
+      "category": "decision-support",
+      "functions": ["query_traces"],
+      "future_mcp_mapping": "trace.query"
+    },
+    {
+      "name": "mock_fleet",
+      "kind": "http-mock-adapter",
+      "category": "decision-support",
+      "functions": ["list_nodes"],
+      "future_mcp_mapping": "fleet.list_nodes"
+    },
+    {
+      "name": "mock_model",
+      "kind": "http-mock-adapter",
+      "category": "decision-support",
+      "functions": ["get_version_history"],
+      "future_mcp_mapping": "model_registry.read"
+    },
+    {
+      "name": "mock_ota",
+      "kind": "http-mock-adapter",
+      "category": "decision-support",
+      "functions": ["list_recent_updates"],
+      "future_mcp_mapping": "ota.read"
+    },
+    {
+      "name": "mock_node",
+      "kind": "http-mock-adapter",
+      "category": "decision-support",
+      "functions": ["get_resource_snapshot"],
+      "future_mcp_mapping": "edge_node.read"
+    },
+    {
+      "name": "mock_runbook",
+      "kind": "http-mock-adapter",
+      "category": "decision-support",
+      "functions": ["search"],
+      "future_mcp_mapping": "knowledge.runbook_search"
+    },
+    {
+      "name": "mock_probe",
+      "kind": "http-mock-adapter",
+      "category": "verification",
+      "functions": ["check_inference_endpoint"],
+      "future_mcp_mapping": "synthetic_probe.inference"
+    },
+    {
+      "name": "mock_executor",
+      "kind": "http-mock-adapter",
+      "category": "execution-request",
+      "note": "Files an execution request; does NOT execute. External Operator polls /tools/{scenario_id}/requests and performs the action in production.",
+      "functions": ["create_action_request", "get_action_request"],
+      "future_mcp_mapping": "executor.request"
+    }
+  ]
+}
