@@ -19,6 +19,7 @@ from typing import Dict, Tuple
 
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
+from pptx.util import Emu, Inches, Pt
 from lxml import etree
 
 
@@ -47,16 +48,29 @@ REPLACEMENTS: Dict[str, str] = {
     "面向云上应用 / SRE 团队\n故障需人工翻日志、查 Trace、审配置\n恢复慢且依赖资深经验": (
         "面向边缘 AI / SRE 团队\n事故需人工翻日志、查 Trace、审配置\nOTA 回归靠资深经验恢复\n千级节点 + 数十模型 + 4 类漂移"
     ),
+    # Slide 2 single-paragraph variants for content boxes
+    "面向云上应用 / SRE 团队": "面向边缘 AI / SRE 团队",
+    "故障需人工翻日志、查 Trace、审配置": "事故需人工翻日志、查 Trace、审配置",
+    "恢复慢且依赖资深经验": "OTA 回归靠资深经验恢复",
+    "千级节点 + 数十模型 + 4 类漂移": "千级节点 + 数十模型 + 4 类漂移",
 
     "核心解决方案": "核心解决方案",
     "多 Agent + Skill + 工具网关\n告警→根因→修复→验证 零人工闭环\n低风险自动执行，高风险审批": (
         "4 职能 Agent + 7 决策 Skill + 工具网关\n检测→归因→规划→验证 零人工闭环\nagents-decide / operators-execute\nHITL seam 做 L2/L3 审批"
     ),
+    # Slide 2 解决方案 single-paragraph variants
+    "多 Agent + Skill + 工具网关": "4 职能 Agent + 7 决策 Skill + 工具网关",
+    "告警→根因→修复→验证 零人工闭环": "检测→归因→规划→验证 零人工闭环",
+    "低风险自动执行，高风险审批": "agents-decide / operators-execute\nHITL seam 做 L2/L3 审批",
 
     "创新点与差异化": "创新点与差异化",
     "4 个 LLM Agent + TeamLeader\n主动跨系统取证\n内置 L0-L3 风险分级": (
         "4 LLM Agent + TeamLeader + Manager\n主动跨系统取证\n内置 L0-L3 风险分级\nmock 与真协议 1:1 对齐"
     ),
+    # Slide 2 创新点 single-paragraph variants
+    "4 个 LLM Agent + TeamLeader": "4 LLM Agent + TeamLeader + Manager",
+    "主动跨系统取证": "主动跨系统取证",
+    "内置 L0-L3 风险分级": "内置 L0-L3 风险分级\nmock 与真协议 1:1 对齐",
 
     "开放 / 复用价值": "开放 / 复用价值",
     "7 个 Skill + 8 类工具契约\n可发布到 Nacos AI Registry\n平滑升级 MCP / Higress": (
@@ -67,6 +81,10 @@ REPLACEMENTS: Dict[str, str] = {
     "2 个生产事故闭环：\n连接池耗尽 + 慢 SQL 劣化\n结构化事故报告": (
         "2 个 Edge AIOps 事故闭环：\nOTA 模型回归 + 边缘节点故障\n结构化事故报告 + 4 周落地 roadmap"
     ),
+    # Slide 2 进展 single-paragraph variants
+    "2 个生产事故闭环：": "2 个 Edge AIOps 事故闭环：",
+    "连接池耗尽 + 慢 SQL 劣化": "OTA 模型回归 + 边缘节点故障",
+    "结构化事故报告": "结构化事故报告 + 4 周落地 roadmap",
 
     # ---- Slide 5: 第一章内容 ----
     "01 · 场景与价值": "01 · 场景与价值",
@@ -368,6 +386,9 @@ def main() -> None:
                         if cell.text_frame:
                             total_text_replacements += replace_in_text_frame(cell.text_frame, REPLACEMENTS)
 
+    # 5) Apply layout fixes (font size + position adjustments)
+    apply_layout_fixes(prs)
+
     prs.save(str(OUTPUT))
 
     size_kb = OUTPUT.stat().st_size / 1024
@@ -376,6 +397,167 @@ def main() -> None:
     print(f"Pictures stripped: {total_pics}")
     print(f"Text replacements: {total_text_replacements}")
     print(f"Output size: {size_kb:.1f} KB (vs 137 MB original)")
+
+
+# ----------------------------------------------------------------------
+# Layout fixes (font sizes + positions)
+# ----------------------------------------------------------------------
+
+def set_font_size(text_frame, target_pt: float, match=None) -> int:
+    """Set font size on every run in the text frame. If `match` is given,
+    only resize paragraphs whose stripped text contains the substring.
+
+    Returns number of paragraphs resized.
+    """
+    n = 0
+    for paragraph in text_frame.paragraphs:
+        text = paragraph.text.strip()
+        if match and match not in text:
+            continue
+        for run in paragraph.runs:
+            run.font.size = Pt(target_pt)
+        n += 1
+    return n
+
+
+def move_shape(shape, top_in: float = None, height_in: float = None) -> None:
+    """Move/resize shape by inches (None = keep)."""
+    if top_in is not None:
+        shape.top = Inches(top_in)
+    if height_in is not None:
+        shape.height = Inches(height_in)
+
+
+def apply_layout_fixes(prs) -> None:
+    """Apply per-slide font-size and position fixes."""
+
+    # ===== Slide 2 (index 1): P0 速览 =====
+    # 6 个方块整体上移 + 内容字号加大 + 标题字号加大
+    slide = prs.slides[1]
+    for shape in slide.shapes:
+        if not shape.has_text_frame:
+            continue
+        text = shape.text_frame.text.strip()
+        # 6 个方块标题（项目名称/问题与场景/...）
+        if text in ("项目名称", "问题与场景", "核心解决方案", "创新点与差异化", "开放 / 复用价值", "当前进展"):
+            for p in shape.text_frame.paragraphs:
+                for r in p.runs:
+                    r.font.size = Pt(18)
+        # 6 个方块内容（Edge AIOps...等）
+        elif any(text.startswith(p) for p in ("Edge AIOps", "面向边缘 AI", "4 职能 Agent", "4 LLM Agent", "① Agent", "7 个 Skill +", "2 个 Edge")):
+            for p in shape.text_frame.paragraphs:
+                for r in p.runs:
+                    r.font.size = Pt(14)
+            # 同时上移
+            try:
+                cur_top = Emu(shape.top or 0).inches
+            except Exception:
+                continue
+            if 3.0 <= cur_top <= 4.0:
+                move_shape(shape, top_in=2.65, height_in=1.10)
+            elif 5.0 <= cur_top <= 6.0:
+                move_shape(shape, top_in=5.15, height_in=1.10)
+    # 6 个方块整体上移（title 在 top=0.72, 内容区起点 2.15 → 改 1.6）
+    block_tops = {"row1": 1.55, "row2": 4.05}
+    box_h = 2.10
+    for shape in slide.shapes:
+        if shape.has_text_frame and shape.text_frame.text.strip() in ("项目名称", "问题与场景", "核心解决方案"):
+            move_shape(shape, top_in=block_tops["row1"])
+        elif shape.has_text_frame and shape.text_frame.text.strip() in ("创新点与差异化", "开放 / 复用价值", "当前进展"):
+            move_shape(shape, top_in=block_tops["row2"])
+        # 同时移动装饰矩形
+        elif shape.shape_type == 1 and shape.name.startswith("Shape "):
+            try:
+                cur_top = Emu(shape.top or 0).inches
+            except Exception:
+                continue
+            if 2.0 <= cur_top <= 2.5:
+                move_shape(shape, top_in=block_tops["row1"] - 0.15)
+            elif 4.0 <= cur_top <= 4.5:
+                move_shape(shape, top_in=block_tops["row2"] - 0.15)
+
+    # ===== Slide 3 (index 2): 目录 =====
+    # 统一章节名 (Skills工具体系 -> Skill 工程体系)
+    slide = prs.slides[2]
+    for shape in slide.shapes:
+        if shape.has_text_frame:
+            t = shape.text_frame.text.strip()
+            if t == "Skills工具体系":
+                shape.text_frame.paragraphs[0].runs[0].text = "Skill 工程体系"
+            elif t == "Demo视频（如有）":
+                shape.text_frame.paragraphs[0].runs[0].text = "团队介绍"
+
+    # ===== Slide 5 (index 4): 场景与价值 =====
+    # 描述文字 10.5 → 13；三个数据框上移 + 缩小高度（不 OOB）
+    slide = prs.slides[4]
+    for shape in slide.shapes:
+        if not shape.has_text_frame:
+            continue
+        text = shape.text_frame.text.strip()
+        # 两个场景描述（长文本）
+        if text.startswith("OTA 把 resnet50") or text.startswith("edge-shanghai-02"):
+            for p in shape.text_frame.paragraphs:
+                for r in p.runs:
+                    r.font.size = Pt(13)
+            try:
+                cur_top = Emu(shape.top or 0).inches
+            except Exception:
+                continue
+            if 3.5 <= cur_top <= 4.5:
+                move_shape(shape, top_in=3.55, height_in=2.40)
+    # 三个数据框（Rectangle + TextBox）整体上移
+    # 用绝对位置查找（OOB 区域：top >= 6.5 的任何 shape 都需要上移）
+    for shape in slide.shapes:
+        try:
+            cur_top = Emu(shape.top or 0).inches
+        except Exception:
+            continue
+        # 把所有 OOB 区域的 shape 移到 5.5 起点
+        if cur_top >= 6.5:
+            new_top = 5.5 + (cur_top - 6.67)
+            move_shape(shape, top_in=new_top)
+
+    # ===== Slide 9 (index 8): 多 Agent 协同 =====
+    # 描述内容 10 → 12；状态流转 11 → 14
+    slide = prs.slides[8]
+    for shape in slide.shapes:
+        if not shape.has_text_frame:
+            continue
+        text = shape.text_frame.text.strip()
+        # 4 个 Agent 框内的多行描述（首行匹配）
+        if text.startswith(("边缘+模型+OTA", "日志+Trace+OTA", "发执行请求", "SLA + 队列状态", "统一编排", "生成方案")):
+            for p in shape.text_frame.paragraphs:
+                for r in p.runs:
+                    r.font.size = Pt(12)
+        elif text == "状态流转":
+            for p in shape.text_frame.paragraphs:
+                for r in p.runs:
+                    r.font.size = Pt(14)
+        elif text.startswith("event →"):
+            for p in shape.text_frame.paragraphs:
+                for r in p.runs:
+                    r.font.size = Pt(13)
+
+    # ===== Slide 11 (index 10): Skill 体系 =====
+    # risk-guard 规格 9.5 → 12；6 个 Skill 契约 10 → 12
+    slide = prs.slides[10]
+    for shape in slide.shapes:
+        if not shape.has_text_frame:
+            continue
+        text = shape.text_frame.text.strip()
+        # ★ risk-guard 完整规格区（长文本）
+        if text.startswith("【输入】"):
+            for p in shape.text_frame.paragraphs:
+                for r in p.runs:
+                    r.font.size = Pt(12)
+        # 6 个 Skill 契约列表
+        elif any(text.startswith(p) for p in ("· alert-fusion", "· impact-mapping", "· log-trace-rca", "· remediation-plan", "· model-governance", "· recovery-verify")):
+            for p in shape.text_frame.paragraphs:
+                for r in p.runs:
+                    r.font.size = Pt(12)
+
+
+from pptx.util import Inches, Pt  # noqa: E402  (re-import is safe; module loads once)
 
 
 if __name__ == "__main__":
