@@ -1,0 +1,123 @@
+{
+  "id": "model_drift",
+  "incident_id": "INC-2001",
+  "title": "ResNet50 accuracy regression after OTA fan-out on Hangzhou edge fleet",
+  "customer": {
+    "name": "Hangzhou Demo Retail Co.",
+    "owner": "Zhang San",
+    "environment": "edge-fleet + nacos + ota + model-registry"
+  },
+  "complaint": {
+    "time": "14:01",
+    "text": "Image classification accuracy on Hangzhou edge nodes dropped sharply after the 14:00 OTA. Customers see mislabeled products. Please check whether this is model, data, node, or OTA issue."
+  },
+  "alerts": [
+    {
+      "id": "ALERT-2001",
+      "time": "14:02",
+      "service": "edge-hangzhou-03",
+      "name": "inference_accuracy_drop",
+      "severity": "P1",
+      "value": 0.71,
+      "unit": "ratio",
+      "evidence_ref": "alert:inference_accuracy_drop"
+    },
+    {
+      "id": "ALERT-2002",
+      "time": "14:02",
+      "service": "edge-hangzhou-03",
+      "name": "drift_score_above_threshold",
+      "severity": "P2",
+      "value": 0.34,
+      "unit": "score",
+      "evidence_ref": "alert:drift_score"
+    },
+    {
+      "id": "ALERT-2003",
+      "time": "14:03",
+      "service": "edge-hangzhou-03",
+      "name": "p99_inference_latency_high",
+      "severity": "P2",
+      "value": 1450,
+      "unit": "ms",
+      "evidence_ref": "alert:p99_inference_latency"
+    }
+  ],
+  "metrics": {
+    "before": {
+      "inference_accuracy": 0.71,
+      "p99_latency_ms": 1450,
+      "fleet_health": "degraded",
+      "drift_score": 0.34
+    },
+    "after_expected": {
+      "inference_accuracy": 0.91,
+      "p99_latency_ms": 420,
+      "fleet_health": "healthy",
+      "drift_score": 0.10
+    }
+  },
+  "fleet": {
+    "nodes": [
+      {"id": "edge-hangzhou-03", "region": "cn-hangzhou", "tier": "P0", "active_model": "resnet50-v3.2.1"},
+      {"id": "edge-hangzhou-04", "region": "cn-hangzhou", "tier": "P0", "active_model": "resnet50-v3.2.1"},
+      {"id": "edge-shanghai-01", "region": "cn-shanghai", "tier": "P1", "active_model": "resnet50-v3.2.1"}
+    ]
+  },
+  "model_versions": [
+    {"model": "resnet50", "version": "v3.2.0", "status": "active_canary", "accuracy": 0.92, "released_at": "2026-08-10T08:00:00Z"},
+    {"model": "resnet50", "version": "v3.2.1", "status": "active_production", "accuracy": 0.71, "released_at": "2026-08-16T13:55:00Z"}
+  ],
+  "ota_history": [
+    {
+      "time": "13:55:00",
+      "package": "resnet50-v3.2.1",
+      "target_nodes": ["edge-hangzhou-03", "edge-hangzhou-04", "edge-shanghai-01"],
+      "canary_percent": 0,
+      "operator": "wang-wu",
+      "rollback_action": {
+        "type": "rollback_model",
+        "model": "resnet50",
+        "from_version": "v3.2.1",
+        "to_version": "v3.2.0"
+      }
+    }
+  ],
+  "node_snapshots": [
+    {"node_id": "edge-hangzhou-03", "cpu_percent": 38, "memory_percent": 41, "gpu_percent": 62, "disk_percent": 29, "network_reachable": true},
+    {"node_id": "edge-hangzhou-04", "cpu_percent": 41, "memory_percent": 45, "gpu_percent": 58, "disk_percent": 31, "network_reachable": true},
+    {"node_id": "edge-shanghai-01", "cpu_percent": 33, "memory_percent": 39, "gpu_percent": 49, "disk_percent": 27, "network_reachable": true}
+  ],
+  "logs": [
+    {"time": "14:01:05", "service": "edge-hangzhou-03", "level": "WARN", "message": "Model version mismatch: active=v3.2.1 desired=v3.2.1 but accuracy below SLO."},
+    {"time": "14:01:12", "service": "edge-hangzhou-03", "level": "ERROR", "message": "Inference prediction confidence dropped to 0.41 average."},
+    {"time": "13:55:02", "service": "ota-controller", "level": "INFO", "message": "OTA package resnet50-v3.2.1 applied to edge-hangzhou-03 without canary stage."},
+    {"time": "13:55:04", "service": "ota-controller", "level": "INFO", "message": "OTA package resnet50-v3.2.1 applied to edge-hangzhou-04 without canary stage."}
+  ],
+  "traces": [
+    {
+      "trace_id": "trace-inf-2001",
+      "endpoint": "/v1/resnet50/predict",
+      "duration_ms": 1450,
+      "spans": [
+        {"service": "edge-gateway", "duration_ms": 14},
+        {"service": "edge-hangzhou-03", "duration_ms": 1430, "status": "low_confidence"},
+        {"service": "model-registry", "duration_ms": 6}
+      ]
+    }
+  ],
+  "runbooks": [
+    {
+      "id": "RB-OTA-001",
+      "title": "OTA fan-out without canary caused accuracy regression",
+      "match_terms": ["accuracy_drop", "ota", "v3.2.1", "v3.2.0", "regression"],
+      "tags": ["ota", "model", "rollback", "canary"],
+      "symptoms": ["accuracy_drop", "p99_latency_high", "drift_score_high"],
+      "recommendation": "Rollback to previous version, add canary stage, validate accuracy >= 0.88 within 5 minutes."
+    }
+  ],
+  "expected_root_cause": {
+    "type": "ota_model_regression",
+    "summary": "OTA rollout of resnet50 v3.2.1 without canary stage caused accuracy regression across the Hangzhou edge fleet."
+  }
+}

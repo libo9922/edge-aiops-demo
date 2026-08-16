@@ -1,0 +1,107 @@
+{
+  "id": "edge_node_failure",
+  "incident_id": "INC-2002",
+  "title": "Edge node fleet degraded by unreachable GPU nodes",
+  "customer": {
+    "name": "Shanghai Demo Logistics Co.",
+    "owner": "Li Si",
+    "environment": "edge-fleet + nacos + ota + model-registry"
+  },
+  "complaint": {
+    "time": "09:20",
+    "text": "Logistics label recognition service is slow. Several edge nodes in the Shanghai region are unreachable. Please check whether this is network, hardware, or model issue."
+  },
+  "alerts": [
+    {
+      "id": "ALERT-2101",
+      "time": "09:21",
+      "service": "edge-shanghai-02",
+      "name": "node_unreachable",
+      "severity": "P1",
+      "value": 1,
+      "unit": "boolean",
+      "evidence_ref": "alert:node_unreachable"
+    },
+    {
+      "id": "ALERT-2102",
+      "time": "09:22",
+      "service": "edge-shanghai-05",
+      "name": "gpu_thermal_critical",
+      "severity": "P1",
+      "value": 92,
+      "unit": "celsius",
+      "evidence_ref": "alert:gpu_thermal"
+    },
+    {
+      "id": "ALERT-2103",
+      "time": "09:23",
+      "service": "edge-shanghai-02",
+      "name": "inference_throughput_low",
+      "severity": "P2",
+      "value": 12,
+      "unit": "qps",
+      "evidence_ref": "alert:throughput_low"
+    }
+  ],
+  "metrics": {
+    "before": {
+      "inference_accuracy": 0.89,
+      "p99_latency_ms": 1850,
+      "fleet_health": "degraded",
+      "drift_score": 0.08
+    },
+    "after_expected": {
+      "inference_accuracy": 0.90,
+      "p99_latency_ms": 720,
+      "fleet_health": "healthy",
+      "drift_score": 0.08
+    }
+  },
+  "fleet": {
+    "nodes": [
+      {"id": "edge-shanghai-02", "region": "cn-shanghai", "tier": "P1", "active_model": "bert-classifier-v1.8.0"},
+      {"id": "edge-shanghai-05", "region": "cn-shanghai", "tier": "P1", "active_model": "bert-classifier-v1.8.0"},
+      {"id": "edge-shanghai-07", "region": "cn-shanghai", "tier": "P0", "active_model": "bert-classifier-v1.8.0"}
+    ]
+  },
+  "model_versions": [
+    {"model": "bert-classifier", "version": "v1.8.0", "status": "active_production", "accuracy": 0.90, "released_at": "2026-08-01T08:00:00Z"}
+  ],
+  "ota_history": [],
+  "node_snapshots": [
+    {"node_id": "edge-shanghai-02", "cpu_percent": 78, "memory_percent": 82, "gpu_percent": 95, "disk_percent": 61, "network_reachable": false},
+    {"node_id": "edge-shanghai-05", "cpu_percent": 71, "memory_percent": 68, "gpu_percent": 97, "disk_percent": 55, "network_reachable": true},
+    {"node_id": "edge-shanghai-07", "cpu_percent": 45, "memory_percent": 51, "gpu_percent": 60, "disk_percent": 33, "network_reachable": true}
+  ],
+  "logs": [
+    {"time": "09:21:14", "service": "edge-shanghai-02", "level": "ERROR", "message": "Heartbeat lost for 30s, marking node unreachable."},
+    {"time": "09:22:03", "service": "edge-shanghai-05", "level": "WARN", "message": "GPU thermal reading 92C exceeds critical threshold 90C."},
+    {"time": "09:22:48", "service": "edge-shanghai-05", "level": "ERROR", "message": "Inference throughput throttled due to thermal protection."}
+  ],
+  "traces": [
+    {
+      "trace_id": "trace-inf-2101",
+      "endpoint": "/v1/bert/logistics-label",
+      "duration_ms": 1850,
+      "spans": [
+        {"service": "edge-gateway", "duration_ms": 22},
+        {"service": "edge-shanghai-02", "duration_ms": 1820, "status": "node_unreachable"},
+        {"service": "edge-shanghai-05", "duration_ms": 8, "status": "throttled"}
+      ]
+    }
+  ],
+  "runbooks": [
+    {
+      "id": "RB-NODE-001",
+      "title": "Edge node unreachable and GPU thermal critical",
+      "match_terms": ["unreachable", "thermal", "gpu", "throttle"],
+      "tags": ["node", "gpu", "thermal", "quarantine"],
+      "symptoms": ["node_unreachable", "gpu_thermal_critical", "throughput_low"],
+      "recommendation": "Quarantine unreachable node, redistribute traffic, throttle thermal node, validate throughput recovery."
+    }
+  ],
+  "expected_root_cause": {
+    "type": "edge_node_failure",
+    "summary": "Edge node edge-shanghai-02 became unreachable and edge-shanghai-05 hit GPU thermal critical, causing fleet-wide inference degradation."
+  }
+}
