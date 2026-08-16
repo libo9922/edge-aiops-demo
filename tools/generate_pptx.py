@@ -477,15 +477,48 @@ def apply_layout_fixes(prs) -> None:
                 move_shape(shape, top_in=block_tops["row2"] - 0.15)
 
     # ===== Slide 3 (index 2): 目录 =====
-    # 统一章节名 (Skills工具体系 -> Skill 工程体系)
+    # 直接覆盖 chapter 4 和 chapter 8 的 chapter 名（多 run 结构）
     slide = prs.slides[2]
     for shape in slide.shapes:
-        if shape.has_text_frame:
-            t = shape.text_frame.text.strip()
-            if t == "Skills工具体系":
-                shape.text_frame.paragraphs[0].runs[0].text = "Skill 工程体系"
-            elif t == "Demo视频（如有）":
-                shape.text_frame.paragraphs[0].runs[0].text = "团队介绍"
+        if not shape.has_text_frame:
+            continue
+        for paragraph in shape.text_frame.paragraphs:
+            for run in paragraph.runs:
+                if run.text == "Skills":
+                    run.text = "Skill 工程体系"
+                elif run.text == "工具体系":
+                    run.text = ""
+                elif run.text == "Demo":
+                    run.text = "团队介绍"
+                elif run.text == "视频（如有":
+                    run.text = ""
+                elif run.text == "）":
+                    run.text = ""
+
+    # ===== Slide 16 (index 15): 落地计划 =====
+    # 替换 INC-1001 / INC-1002 为 INC-2001 / INC-2002
+    slide = prs.slides[15]
+    for shape in slide.shapes:
+        if not shape.has_text_frame:
+            continue
+        for paragraph in shape.text_frame.paragraphs:
+            for run in paragraph.runs:
+                if run.text == "INC-1001":
+                    run.text = "INC-2001"
+                elif run.text == "INC-1002":
+                    run.text = "INC-2002"
+
+    # ===== Slide 13 / Slide 15: 全局 INC 替换 =====
+    for slide in prs.slides:
+        for shape in slide.shapes:
+            if not shape.has_text_frame:
+                continue
+            for paragraph in shape.text_frame.paragraphs:
+                for run in paragraph.runs:
+                    if "INC-1001" in run.text:
+                        run.text = run.text.replace("INC-1001", "INC-2001")
+                    if "INC-1002" in run.text:
+                        run.text = run.text.replace("INC-1002", "INC-2002")
 
     # ===== Slide 5 (index 4): 场景与价值 =====
     # 描述文字 10.5 → 13；三个数据框上移 + 缩小高度（不 OOB）
