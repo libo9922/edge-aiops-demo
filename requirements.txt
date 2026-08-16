@@ -1,0 +1,23 @@
+# Edge AIOps Demo — Runtime Dependencies
+#
+# Mock tool gateway: stdlib only (Python 3.10+).
+# Agent runtime itself is provided by AgentTeams (not listed here).
+# Final-stage adapters (see docs/final-roadmap.md) would add:
+#   prometheus-client, opentelemetry-api, mlflow, kubernetes, requests
+
+# Python minimum
+python>=3.10
+
+# Mock tool gateway uses only the standard library.
+# No third-party dependencies required for v0.3.0.
+
+# --- Final-stage optional dependencies (DO NOT install for demo) ---
+# prometheus-client>=0.20
+# opentelemetry-api>=1.25
+# opentelemetry-sdk>=1.25
+# opentelemetry-exporter-otlp>=1.25
+# mlflow>=2.16
+# kubernetes>=29.0
+# requests>=2.31
+# sentence-transformers>=3.0
+# chromadb>=0.5

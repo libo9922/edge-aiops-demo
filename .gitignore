@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test / runtime artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+/tmp/
+gateway.log
+gw*.log
+
+# Local secrets (never commit tokens)
+.env
+.env.local
+*.pem
+*.key
+
+# Mock runtime artifacts
+*.pid
+/tmp_*
